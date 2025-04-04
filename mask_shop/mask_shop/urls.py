@@ -24,5 +24,5 @@ urlpatterns = [
     path('', include('shop.urls')),
     path('', views.home, name='home'),
     path('about/', views.about, name='about'),
-    path('author/', views.author, name='author'),    
+    path('author/', views.author, name='author'),
 ]

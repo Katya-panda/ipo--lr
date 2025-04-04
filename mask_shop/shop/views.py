@@ -16,24 +16,43 @@ def author(request):
 from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import status
-import json
 from pathlib import Path
 from django.conf import settings
+import json
+import logging
+from urllib.parse import urljoin
+
+logger = logging.getLogger(__name__)
 
 class QualificationViewSet(ViewSet):
+    def get_data_path(self):
+        """Определяем путь к файлу данных"""
+        return Path(settings.BASE_DIR).parent / 'dump.json'  # Файл в корне репозитория
+
+    def _load_data(self):
+        """Загрузка данных из JSON файла"""
+        file_path = self.get_data_path()
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                return json.load(file)
+        except FileNotFoundError:
+            logger.error(f"Файл не найден: {file_path}")
+            raise Exception(f"Файл данных не найден по пути: {file_path}")
+        except json.JSONDecodeError:
+            logger.error("Ошибка чтения JSON файла")
+            raise Exception("Файл содержит некорректные JSON данные")
+
     def list(self, request):
         """GET /spec/ - список всех квалификаций"""
         try:
-            file_path = Path(settings.BASE_DIR) / 'dump.json'
-            with open(file_path, 'r', encoding='utf-8') as file:
-                data = json.load(file)
+            data = self._load_data()
             
             qualifications = [
                 {
                     "id": item["pk"],
                     "title": item["fields"]["title"],
                     "code": item["fields"]["code"],
-                    "link": f"{request.build_absolute_uri('/')}spec/{item['pk']}/"
+                    "link": urljoin(request.build_absolute_uri('/'), f"spec/{item['pk']}/")
                 }
                 for item in data if item.get("model") == "data.skill"
             ]
@@ -55,19 +74,21 @@ class QualificationViewSet(ViewSet):
     def retrieve(self, request, pk=None):
         """GET /spec/<pk>/ - детали квалификации"""
         try:
-            file_path = Path(settings.BASE_DIR) / 'dump.json'
-            with open(file_path, 'r', encoding='utf-8') as file:
-                data = json.load(file)
+            data = self._load_data()
             
             qualification = next(
                 (item for item in data 
-                 if item.get("model") == "data.skill" and item["pk"] == int(pk)),
+                 if item.get("model") == "data.skill" and str(item["pk"]) == str(pk)),
                 None
             )
             
             if not qualification:
+                available_ids = [item["pk"] for item in data if item.get("model") == "data.skill"]
                 return Response(
-                    {"error": f"Квалификация с ID {pk} не найдена"},
+                    {
+                        "error": f"Квалификация с ID {pk} не найдена",
+                        "available_ids": available_ids
+                    },
                     status=status.HTTP_404_NOT_FOUND
                 )
             
@@ -75,10 +96,10 @@ class QualificationViewSet(ViewSet):
                 "id": qualification["pk"],
                 "code": qualification["fields"]["code"],
                 "title": qualification["fields"]["title"],
-                "specialty": qualification["fields"]["specialty"],
-                "description": qualification["fields"]["desc"],
+                "specialty": qualification["fields"].get("specialty"),
+                "description": qualification["fields"].get("desc"),
                 "links": {
-                    "list": request.build_absolute_uri('/') + "spec/",
+                    "list": urljoin(request.build_absolute_uri('/'), "spec/"),
                     "self": request.build_absolute_uri()
                 }
             })
@@ -93,4 +114,3 @@ class QualificationViewSet(ViewSet):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
