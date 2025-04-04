@@ -66,13 +66,21 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31_536_000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
-ALLOWED_HOSTS = ['127.0.0.1']
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    '0.0.0.0',
+    '[::1]',  # IPv6
+    'localhost:8000',
+    '127.0.0.1:8000'
+    ]
 
 
 # Application definition
 
 INSTALLED_APPS = [
     'shop',
+    'rest_framework',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
